@@ -31,13 +31,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build clientDCP.exe
+      - name: Build clientDCPx86.exe
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name "clientDCP_${{ matrix.name_suffix }}" clientDCP.py
+          pyinstaller --noconfirm --onefile --windowed --name "clientDCP_${{ matrix.name_suffix }}" clientDCPx86.py
 
-      - name: Build clients.exe
+      - name: Build clientsx86.exe
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name "clients_${{ matrix.name_suffix }}" clients.py
+          pyinstaller --noconfirm --onefile --windowed --name "clients_${{ matrix.name_suffix }}" clientsx86.py
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
