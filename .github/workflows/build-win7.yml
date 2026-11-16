@@ -1,0 +1,46 @@
+name: Build Executable (Windows 7 32-bit & 64-bit)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86
+            name_suffix: win7_32bit
+          - arch: x64
+            name_suffix: win64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.8.10 (${{ matrix.arch }})
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8.10'
+          architecture: ${{ matrix.arch }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build clientDCP.exe
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name "clientDCP_${{ matrix.name_suffix }}" clientDCP.py
+
+      - name: Build clients.exe
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name "clients_${{ matrix.name_suffix }}" clients.py
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-${{ matrix.name_suffix }}
+          path: dist/*.exe
