@@ -19,7 +19,11 @@ CONFIG_CLIENT_FILE = "config_client.json"
 
 DEFAULT_CLIENT_CONFIG = {
     "TARGET_APP_PATH": r"D:\release_induk\PGDCNEWPicking.exe",
-    "TARGET_EXE_NAME": "PGDCNEWPicking.exe"
+    "TARGET_EXE_NAME": "PGDCNEWPicking.exe",
+    # Koordinat klik. Merah = Stop, Hijau = Start (dulu namanya Biru).
+    # Diubah lewat tray -> "Atur Koordinat Klik...", tersimpan di config_client.json.
+    "KOORDINAT_MERAH": [416, 67],
+    "KOORDINAT_HIJAU": [254, 65],
 }
 
 # ==========================================
@@ -71,10 +75,10 @@ def buka_gui_settings():
             return
             
         exe_name = os.path.basename(path)
-        new_config = {
-            "TARGET_APP_PATH": path,
-            "TARGET_EXE_NAME": exe_name
-        }
+        # Update 2 key saja, jangan timpa seluruh config (koordinat ikut kehapus kalau ditimpa).
+        new_config = load_client_config()
+        new_config["TARGET_APP_PATH"] = path
+        new_config["TARGET_EXE_NAME"] = exe_name
         if save_client_config(new_config):
             messagebox.showinfo("Sukses", f"Pengaturan tersimpan!\nEXE: {exe_name}")
             root.destroy()
@@ -106,9 +110,136 @@ def buka_gui_settings():
 
     root.mainloop()
 
-# Koordinat Makro
-KOORDINAT_MERAH = (416, 67)  # X, Y untuk Klik 1 (Makro Awal)
-KOORDINAT_BIRU = (254, 65)  # X, Y untuk Klik 2
+def buka_gui_koordinat():
+    """GUI atur koordinat Merah (Stop) & Hijau (Start).
+
+    Dua cara isi:
+      1) Ketik manual X / Y, lalu Simpan.
+      2) Klik 'Tangkap Posisi Mouse (3 detik)', arahkan mouse ke tombol
+         target di aplikasi, diam 3 detik -> koordinat terisi otomatis.
+    """
+    config = load_client_config()
+    merah = _as_xy(config.get("KOORDINAT_MERAH"), (416, 67))
+    hijau = _as_xy(config.get("KOORDINAT_HIJAU", config.get("KOORDINAT_BIRU")), (254, 65))
+
+    root = tk.Tk()
+    root.title("Atur Koordinat Klik")
+    root.geometry("420x300")
+    root.resizable(False, False)
+    root.attributes('-topmost', True)
+
+    tk.Label(root, text="Merah = Stop  |  Hijau = Start",
+             font=("Arial", 9, "bold")).pack(pady=(12, 4))
+    tk.Label(root, text="Koordinat disimpan di config_client.json",
+             font=("Arial", 8), fg="gray").pack(pady=(0, 10))
+
+    entries = {}
+
+    def buat_baris(label_text, nilai_awal, warna):
+        frame = tk.Frame(root)
+        frame.pack(fill="x", padx=20, pady=4)
+        tk.Label(frame, text=label_text, font=("Arial", 9, "bold"),
+                 fg=warna, width=14, anchor="w").pack(side="left")
+        tk.Label(frame, text="X:", font=("Arial", 9)).pack(side="left")
+        ex = tk.Entry(frame, font=("Arial", 9), width=7)
+        ex.insert(0, str(nilai_awal[0]))
+        ex.pack(side="left", padx=(2, 8))
+        tk.Label(frame, text="Y:", font=("Arial", 9)).pack(side="left")
+        ey = tk.Entry(frame, font=("Arial", 9), width=7)
+        ey.insert(0, str(nilai_awal[1]))
+        ey.pack(side="left", padx=(2, 8))
+        entries[label_text] = (ex, ey)
+
+        def tangkap():
+            # Kasih waktu user memindahkan mouse ke tombol target.
+            btn_tangkap.config(state="disabled")
+            lbl_status.config(text="Arahkan mouse ke target... 3 detik lagi")
+            root.update()
+
+            def ambil():
+                x, y = pyautogui.position()
+                ex.delete(0, tk.END)
+                ex.insert(0, str(x))
+                ey.delete(0, tk.END)
+                ey.insert(0, str(y))
+                lbl_status.config(text=f"Tertangkap: ({x}, {y})")
+                btn_tangkap.config(state="normal")
+
+            root.after(3000, ambil)
+
+        btn_tangkap = tk.Button(frame, text="Tangkap Posisi Mouse (3 dtk)",
+                                 command=tangkap)
+        btn_tangkap.pack(side="left")
+        return btn_tangkap
+
+    buat_baris("Merah (Stop)", merah, "red")
+    buat_baris("Hijau (Start)", hijau, "green")
+
+    lbl_status = tk.Label(root, text="", font=("Arial", 8), fg="gray")
+    lbl_status.pack(pady=(8, 0))
+
+    def simpan():
+        try:
+            mx = int(entries["Merah (Stop)"][0].get())
+            my = int(entries["Merah (Stop)"][1].get())
+            hx = int(entries["Hijau (Start)"][0].get())
+            hy = int(entries["Hijau (Start)"][1].get())
+        except ValueError:
+            messagebox.showerror("Error", "X dan Y harus angka!")
+            return
+        new_config = load_client_config()
+        new_config["KOORDINAT_MERAH"] = [mx, my]
+        new_config["KOORDINAT_HIJAU"] = [hx, hy]
+        new_config.pop("KOORDINAT_BIRU", None)  # nama lama dibersihkan
+        if save_client_config(new_config):
+            messagebox.showinfo(
+                "Sukses",
+                f"Koordinat tersimpan!\nMerah (Stop): ({mx}, {my})\nHijau (Start): ({hx}, {hy})")
+            root.destroy()
+        else:
+            messagebox.showerror("Error", "Gagal menyimpan file konfigurasi JSON.")
+
+    tk.Button(root, text="Simpan Koordinat", bg="#28a745", fg="white",
+              font=("Arial", 9, "bold"), command=simpan).pack(pady=14)
+    root.mainloop()
+
+
+# Koordinat Makro — JANGAN hardcode di sini lagi.
+# Nilai default ada di DEFAULT_CLIENT_CONFIG, nilai aktif dibaca dari
+# config_client.json lewat get_koordinat_merah() / get_koordinat_hijau()
+# setiap kali makro jalan, jadi perubahan lewat GUI langsung kepakai
+# tanpa restart aplikasi. KOORDINAT_BIRU dipertahankan sebagai alias
+# biar kode lama / config lama tidak error.
+def _as_xy(value, fallback):
+    """Ubah [x, y] / (x, y) / "x,y" dari JSON jadi tuple (int, int)."""
+    try:
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            return (int(value[0]), int(value[1]))
+        if isinstance(value, str) and "," in value:
+            a, b = value.split(",", 1)
+            return (int(a.strip()), int(b.strip()))
+    except (ValueError, TypeError):
+        pass
+    return fallback
+
+
+def get_koordinat_merah():
+    config = load_client_config()
+    return _as_xy(config.get("KOORDINAT_MERAH"), (416, 67))
+
+
+def get_koordinat_hijau():
+    config = load_client_config()
+    # Migrasi: config lama mungkin masih pakai nama KOORDINAT_BIRU.
+    if "KOORDINAT_HIJAU" not in config and "KOORDINAT_BIRU" in config:
+        return _as_xy(config.get("KOORDINAT_BIRU"), (254, 65))
+    return _as_xy(config.get("KOORDINAT_HIJAU"), (254, 65))
+
+
+# Alias kompatibilitas — jangan dipakai di kode baru, pakai getter di atas.
+KOORDINAT_MERAH = (416, 67)
+KOORDINAT_HIJAU = (254, 65)
+KOORDINAT_BIRU = KOORDINAT_HIJAU
 
 
 import struct
@@ -142,9 +273,11 @@ ensure_vcredist()
 def eksekusi_makro_biasa():
     """Menjalankan fungsi makro awal yang persis seperti sebelumnya."""
     print("Mengeksekusi makro biasa (tanpa restart)...")
-    
+    koordinat_merah = get_koordinat_merah()
+    koordinat_hijau = get_koordinat_hijau()
+
     for _ in range(3):
-        pyautogui.click(KOORDINAT_MERAH[0], KOORDINAT_MERAH[1])
+        pyautogui.click(koordinat_merah[0], koordinat_merah[1])
         time.sleep(0.2)
         
     time.sleep(0.5)
@@ -156,9 +289,9 @@ def eksekusi_makro_biasa():
     time.sleep(0.5)
     
     for _ in range(2):
-        pyautogui.click(KOORDINAT_BIRU[0], KOORDINAT_BIRU[1])
+        pyautogui.click(koordinat_hijau[0], koordinat_hijau[1])
         time.sleep(0.2)
-        
+
     print("✅ Makro biasa selesai!")
     return True
 
@@ -191,7 +324,7 @@ def eksekusi_restart_dan_makro():
     print("Menunggu aplikasi siap...")
     time.sleep(5)
 
-    pyautogui.click(KOORDINAT_MERAH[0], KOORDINAT_MERAH[1])
+    pyautogui.click(*get_koordinat_merah())
     time.sleep(0.5)
 
     print("Memulai input login & navigasi...")
@@ -210,9 +343,9 @@ def eksekusi_restart_dan_makro():
     time.sleep(0.8)
     
     for _ in range(2):
-        pyautogui.click(KOORDINAT_BIRU[0], KOORDINAT_BIRU[1])
+        pyautogui.click(*get_koordinat_hijau())
         time.sleep(0.2)
-    
+
     print("✅ Restart dan makro PGDCNewPicking sukses dieksekusi!")
 
 
@@ -302,6 +435,7 @@ def setup_tray():
     menu = pystray.Menu(
         pystray.MenuItem("Client Listener (Running Port 5005)", None, enabled=False),
         pystray.MenuItem("Pengaturan Aplikasi...", lambda: threading.Thread(target=buka_gui_settings, daemon=True).start()),
+        pystray.MenuItem("Atur Koordinat Klik...", lambda: threading.Thread(target=buka_gui_koordinat, daemon=True).start()),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Exit", stop_application)
     )

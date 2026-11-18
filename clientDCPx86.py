@@ -20,7 +20,10 @@ CONFIG_CLIENT_FILE = "config_client.json"
 
 DEFAULT_CLIENT_CONFIG = {
     "TARGET_APP_PATH": r"D:\release_induk\PGDCNEWPicking.exe",
-    "TARGET_EXE_NAME": "PGDCNEWPicking.exe"
+    "TARGET_EXE_NAME": "PGDCNEWPicking.exe",
+    # Koordinat klik akhir (Open). Diubah lewat tray -> "Atur Koordinat Klik...",
+    # tersimpan di config_client.json.
+    "KOORDINAT_OPEN": [350, 95],
 }
 
 # Win32 shortcuts
@@ -80,10 +83,10 @@ def buka_gui_settings():
             return
 
         exe_name = os.path.basename(path)
-        new_config = {
-            "TARGET_APP_PATH": path,
-            "TARGET_EXE_NAME": exe_name
-        }
+        # Update 2 key saja, jangan timpa seluruh config (koordinat ikut kehapus kalau ditimpa).
+        new_config = load_client_config()
+        new_config["TARGET_APP_PATH"] = path
+        new_config["TARGET_EXE_NAME"] = exe_name
         if save_client_config(new_config):
             messagebox.showinfo("Sukses", f"Pengaturan tersimpan!\nEXE: {exe_name}")
             root.destroy()
@@ -118,7 +121,110 @@ def buka_gui_settings():
     root.mainloop()
 
 
-# Koordinat Akhir
+def buka_gui_koordinat():
+    """GUI atur koordinat Open (klik akhir).
+
+    Dua cara isi:
+      1) Ketik manual X / Y, lalu Simpan.
+      2) Klik 'Tangkap Posisi Mouse (3 detik)', arahkan mouse ke tombol
+         target di aplikasi, diam 3 detik -> koordinat terisi otomatis.
+    """
+    config = load_client_config()
+    open_xy = _as_xy(config.get("KOORDINAT_OPEN"), (350, 95))
+
+    root = tk.Tk()
+    root.title("Atur Koordinat Klik")
+    root.geometry("420x200")
+    root.resizable(False, False)
+    root.attributes('-topmost', True)
+
+    tk.Label(root, text="Open = Klik Akhir",
+             font=("Arial", 9, "bold")).pack(pady=(12, 4))
+    tk.Label(root, text="Koordinat disimpan di config_client.json",
+             font=("Arial", 8), fg="gray").pack(pady=(0, 10))
+
+    frame = tk.Frame(root)
+    frame.pack(fill="x", padx=20, pady=4)
+    tk.Label(frame, text="Open", font=("Arial", 9, "bold"),
+             fg="blue", width=14, anchor="w").pack(side="left")
+    tk.Label(frame, text="X:", font=("Arial", 9)).pack(side="left")
+    ex = tk.Entry(frame, font=("Arial", 9), width=7)
+    ex.insert(0, str(open_xy[0]))
+    ex.pack(side="left", padx=(2, 8))
+    tk.Label(frame, text="Y:", font=("Arial", 9)).pack(side="left")
+    ey = tk.Entry(frame, font=("Arial", 9), width=7)
+    ey.insert(0, str(open_xy[1]))
+    ey.pack(side="left", padx=(2, 8))
+
+    lbl_status = tk.Label(root, text="", font=("Arial", 8), fg="gray")
+    lbl_status.pack(pady=(8, 0))
+
+    def tangkap():
+        # Kasih waktu user memindahkan mouse ke tombol target.
+        btn_tangkap.config(state="disabled")
+        lbl_status.config(text="Arahkan mouse ke target... 3 detik lagi")
+        root.update()
+
+        def ambil():
+            x, y = pyautogui.position()
+            ex.delete(0, tk.END)
+            ex.insert(0, str(x))
+            ey.delete(0, tk.END)
+            ey.insert(0, str(y))
+            lbl_status.config(text=f"Tertangkap: ({x}, {y})")
+            btn_tangkap.config(state="normal")
+
+        root.after(3000, ambil)
+
+    btn_tangkap = tk.Button(frame, text="Tangkap Posisi Mouse (3 dtk)",
+                            command=tangkap)
+    btn_tangkap.pack(side="left")
+
+    def simpan():
+        try:
+            ox = int(ex.get())
+            oy = int(ey.get())
+        except ValueError:
+            messagebox.showerror("Error", "X dan Y harus angka!")
+            return
+        new_config = load_client_config()
+        new_config["KOORDINAT_OPEN"] = [ox, oy]
+        if save_client_config(new_config):
+            messagebox.showinfo(
+                "Sukses",
+                f"Koordinat tersimpan!\nOpen: ({ox}, {oy})")
+            root.destroy()
+        else:
+            messagebox.showerror("Error", "Gagal menyimpan file konfigurasi JSON.")
+
+    tk.Button(root, text="Simpan Koordinat", bg="#28a745", fg="white",
+              font=("Arial", 9, "bold"), command=simpan).pack(pady=14)
+    root.mainloop()
+
+
+# Koordinat Makro — JANGAN hardcode di sini lagi.
+# Nilai default ada di DEFAULT_CLIENT_CONFIG, nilai aktif dibaca dari
+# config_client.json lewat get_koordinat_open() setiap kali makro jalan,
+# jadi perubahan lewat GUI langsung kepakai tanpa restart aplikasi.
+def _as_xy(value, fallback):
+    """Ubah [x, y] / (x, y) / "x,y" dari JSON jadi tuple (int, int)."""
+    try:
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            return (int(value[0]), int(value[1]))
+        if isinstance(value, str) and "," in value:
+            a, b = value.split(",", 1)
+            return (int(a.strip()), int(b.strip()))
+    except (ValueError, TypeError):
+        pass
+    return fallback
+
+
+def get_koordinat_open():
+    config = load_client_config()
+    return _as_xy(config.get("KOORDINAT_OPEN"), (350, 95))
+
+
+# Alias kompatibilitas — jangan dipakai di kode baru, pakai getter di atas.
 KOORDINAT_OPEN = (350, 95)
 
 import struct
@@ -241,8 +347,8 @@ def eksekusi_restart_dan_makro():
     pyautogui.press('d')
     time.sleep(0.5)
 
-    # 7. Klik di koordinat akhir
-    pyautogui.click(KOORDINAT_OPEN[0], KOORDINAT_OPEN[1])
+    # 7. Klik di koordinat akhir (dibaca dari config, bisa diubah lewat GUI)
+    pyautogui.click(*get_koordinat_open())
 
     print("✅ Restart dan makro sukses dieksekusi!")
 
@@ -335,6 +441,10 @@ def setup_tray():
         pystray.MenuItem(
             "Pengaturan Aplikasi...",
             lambda: threading.Thread(target=buka_gui_settings, daemon=True).start()
+        ),
+        pystray.MenuItem(
+            "Atur Koordinat Klik...",
+            lambda: threading.Thread(target=buka_gui_koordinat, daemon=True).start()
         ),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Exit", stop_application)
