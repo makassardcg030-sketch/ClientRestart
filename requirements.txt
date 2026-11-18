@@ -2,4 +2,7 @@ setuptools==65.5.1
 pyautogui==0.9.54
 pillow==9.5.0
 pystray==0.19.4
-pyinstaller==5.13.2
+six==1.16.0
+# PIN WAJIB — cx-Freeze 6.15.0 ditulis untuk lief 0.14.x.
+lief==0.14.1
+cx-Freeze==6.15.0
