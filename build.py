@@ -31,6 +31,49 @@ if sys.version_info[:2] != (3, 8):
     print("[build] Lalu:  py -3.8 -m venv .venv38  ->  .venv38\\Scripts\\activate")
     sys.exit(1)
 
+# --- SHIM lief: cx_Freeze 6.15.0 ditulis untuk lief 0.14.x ---
+# lief 0.15/0.16 mengubah 2 API, bikin cx_Freeze 6.15.0 crash:
+#   1) lief.logging.LOGGING_LEVEL hilang  -> AttributeError di parser.py
+#   2) lief.PE.parse(raw, path.name) ditolak -> TypeError, arg ke-2 harus ParserConfig
+# Shim ini bikin build jalan walau pip terlanjur narik lief terbaru.
+# Ditaruh SEBELUM import cx_Freeze, karena cx_Freeze manggil API itu saat import.
+try:
+    import lief as _lief
+
+    # 1) Pulihkan lief.logging.LOGGING_LEVEL
+    try:
+        _logging = _lief.logging
+        if not hasattr(_logging, "LOGGING_LEVEL"):
+            # lief baru pakai lief.logging.LEVEL, lief lama pakai LOGGING_LEVEL
+            _logging.LOGGING_LEVEL = getattr(_logging, "LEVEL", None)
+            if _logging.LOGGING_LEVEL is None:
+                class _DummyLevel:
+                    ERROR = 0
+                _logging.LOGGING_LEVEL = _DummyLevel
+            print(f"[build] shim: lief.logging.LOGGING_LEVEL dipulihkan (lief {_lief.__version__})")
+    except Exception as _e:
+        print(f"[build] shim logging dilewati: {_e}")
+
+    # 2) Bungkus lief.PE.parse biar terima (FileIO, str) ala cx_Freeze 6.15.0
+    try:
+        _orig_parse = _lief.PE.parse
+
+        def _patched_parse(obj, config_or_name=None, *args, **kwargs):
+            # cx_Freeze 6.15.0 manggil: parse(file_obj, "nama.exe")
+            # lief baru maunya: parse(file_obj) atau parse(file_obj, ParserConfig)
+            if isinstance(config_or_name, str):
+                return _orig_parse(obj, *args, **kwargs)
+            if config_or_name is None:
+                return _orig_parse(obj, *args, **kwargs)
+            return _orig_parse(obj, config_or_name, *args, **kwargs)
+
+        _lief.PE.parse = _patched_parse
+        print("[build] shim: lief.PE.parse dipatch untuk cx_Freeze 6.15.0")
+    except Exception as _e:
+        print(f"[build] shim PE.parse dilewati: {_e}")
+except ImportError:
+    print("[build] shim: lief tidak ter-install, dilewati (cx_Freeze pakai fallback)")
+
 from cx_Freeze import setup, Executable
 
 # --- Suffix dari env (diisi workflow) atau default lokal ---
