@@ -2,7 +2,9 @@ name: Build Executable (Windows 7 & Windows 10, 32-bit & 64-bit)
 
 on:
   push:
-    branches: ["main", "master"]
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
   workflow_dispatch:
 
 jobs:
@@ -18,6 +20,7 @@ jobs:
           # --- Windows 7 32-bit ---
           - arch: x86
             name_suffix: win7_32bit
+            # Python 3.8.10 32-bit: versi terakhir yg resmi support Win7 32-bit
           # --- Windows 7 64-bit / Windows 10 64-bit ---
           # 1 build 64-bit ini jalan di Win7 x64 DAN Win10 x64,
           # karena Python 3.8 tidak memakai API yg hanya ada di Win10.
@@ -39,7 +42,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           python --version
-          pip show cx-Freeze
+          pip show cx-Freeze lief
 
       - name: Build with cx_Freeze
         env:

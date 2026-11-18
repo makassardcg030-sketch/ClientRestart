@@ -2,6 +2,11 @@ setuptools==65.5.1
 pyautogui==0.9.54
 pillow==9.5.0
 pystray==0.19.4
+# PENTING: JANGAN biarkan pip narik lief terbaru.
+# cx-Freeze 6.15.0 butuh lief 0.14.x. lief 0.15+ menghapus
+# lief.logging.LOGGING_LEVEL -> error:
+# AttributeError: module 'lief._lief.logging' has no attribute 'LOGGING_LEVEL'
+lief==0.14.1
 cx-Freeze==6.15.0
 # cx-Freeze 6.15.0 = versi terakhir yg support Python 3.8 + Windows 7.
 # JANGAN upgrade ke cx-Freeze 7/8 (butuh Python 3.9+, drop Win7).
