@@ -2,4 +2,8 @@ setuptools==65.5.1
 pyautogui==0.9.54
 pillow==9.5.0
 pystray==0.19.4
-pyinstaller==5.13.2
+cx-Freeze==6.15.0
+# cx-Freeze 6.15.0 = versi terakhir yg support Python 3.8 + Windows 7.
+# JANGAN upgrade ke cx-Freeze 7/8 (butuh Python 3.9+, drop Win7).
+# pyautogui 0.9.54, Pillow 9.5.0, pystray 0.19.4 = versi terakhir yg aman di Win7.
+# TIDAK ada pyinstaller lagi di sini — build full cx_Freeze.

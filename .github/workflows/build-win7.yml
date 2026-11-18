@@ -1,19 +1,26 @@
-name: Build Executable (Windows 7 32-bit & 64-bit)
+name: Build Executable (Windows 7 & Windows 10, 32-bit & 64-bit)
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main", "master"]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # windows-2022 = Server 2022. JANGAN windows-latest (Server 2025) —
+    # toolchain-nya lebih baru dan berisiko menghasilkan biner yg
+    # menolak jalan di Windows 7.
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
         include:
+          # --- Windows 7 32-bit ---
           - arch: x86
             name_suffix: win7_32bit
+          # --- Windows 7 64-bit / Windows 10 64-bit ---
+          # 1 build 64-bit ini jalan di Win7 x64 DAN Win10 x64,
+          # karena Python 3.8 tidak memakai API yg hanya ada di Win10.
           - arch: x64
             name_suffix: win64
 
@@ -24,25 +31,38 @@ jobs:
       - name: Setup Python 3.8.10 (${{ matrix.arch }})
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8.10'
+          python-version: "3.8.10"
           architecture: ${{ matrix.arch }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "setuptools==65.5.1" wheel
           pip install -r requirements.txt
+          python --version
+          pip show cx-Freeze
 
-      - name: Build clientDCP
+      - name: Build with cx_Freeze
+        env:
+          BUILD_SUFFIX: ${{ matrix.name_suffix }}
         run: |
-          pyinstaller --clean --noconfirm --onefile --windowed --noupx --exclude-module pkg_resources --hidden-import=pyexpat --name "clientDCP_${{ matrix.name_suffix }}" clientDCPx86.py
+          python build.py build_exe --build-exe "dist/build_${{ matrix.name_suffix }}"
 
-      - name: Build clients
+      - name: Verify output
+        shell: pwsh
         run: |
-          pyinstaller --clean --noconfirm --onefile --windowed --noupx --exclude-module pkg_resources --hidden-import=pyexpat --name "clients_${{ matrix.name_suffix }}" clientsx86.py
+          Get-ChildItem -Recurse dist | Select-Object FullName, Length
+          if (-not (Test-Path "dist/build_${{ matrix.name_suffix }}/clientDCP_${{ matrix.name_suffix }}.exe")) { throw "clientDCP exe hilang!" }
+          if (-not (Test-Path "dist/build_${{ matrix.name_suffix }}/clients_${{ matrix.name_suffix }}.exe")) { throw "clients exe hilang!" }
+
+      - name: Zip hasil build (biar gampang dibagikan)
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/build_${{ matrix.name_suffix }}/*" -DestinationPath "dist/ClientDCP-${{ matrix.name_suffix }}.zip"
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Build-${{ matrix.name_suffix }}
-          path: dist/*.exe
+          path: |
+            dist/build_${{ matrix.name_suffix }}/
+            dist/ClientDCP-${{ matrix.name_suffix }}.zip
