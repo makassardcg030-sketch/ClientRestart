@@ -2,13 +2,7 @@ setuptools==65.5.1
 pyautogui==0.9.54
 pillow==9.5.0
 pystray==0.19.4
-# === PIN WAJIB — JANGAN DIHAPUS / JANGAN DI-UPGRADE ===
-# cx-Freeze 6.15.0 ditulis untuk lief 0.14.x.
-# Kalau lief dibiarkan latest (0.15/0.16), build gagal 2x:
-#  1) AttributeError: lief.logging has no attribute 'LOGGING_LEVEL'
-#  2) TypeError: lief.PE.parse() incompatible arguments (FileIO, str)
-# Urutan penting: lief HARUS di atas cx-Freeze.
+six==1.16.0
+# PIN WAJIB — cx-Freeze 6.15.0 ditulis untuk lief 0.14.x.
 lief==0.14.1
 cx-Freeze==6.15.0
-# cx-Freeze 6.15.0 = versi terakhir yg support Python 3.8 + Windows 7.
-# JANGAN upgrade ke cx-Freeze 7/8 (butuh Python 3.9+, drop Win7).

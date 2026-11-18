@@ -105,6 +105,15 @@ build_exe_options = {
         "PIL",
         "pyautogui",
         "pystray",
+        # FIX: pystray ngeload backend Win32 secara dinamis, jadi cx_Freeze
+        # tidak otomatis mendeteksi modul-modul ini. Kalau tidak ditulis
+        # eksplisit di sini, hasil freeze error:
+        #   ImportError: This platform is not supported: No module named 'queue'
+        "pystray._win32",
+        "pystray._util",
+        "queue",
+        "threading",
+        "six",
         "pygetwindow",
         "pymsgbox",
         "mouseinfo",
@@ -125,8 +134,11 @@ build_exe_options = {
         "pydoc",
     ],
     "include_files": include_files,
-    # Zip semua .pyc ke library.zip -> folder lebih rapi, startup sedikit lebih cepat
-    "zip_include_packages": "*",
+    # JANGAN zip packages ke library.zip.
+    # zip_include_packages="*" bikin modul yg di-load dinamis (seperti
+    # pystray._win32 / queue) gagal ke-load di hasil freeze.
+    # Biar semua modul jadi file .pyc biasa di folder lib/.
+    "zip_include_packages": [],
     "zip_exclude_packages": [],
     "optimize": 1,
     # cx_Freeze otomatis bundling vcruntime140.dll (Python 3.8) -> jalan di Win7 & Win10
